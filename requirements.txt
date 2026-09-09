@@ -1,0 +1,15 @@
+numpy
+scipy
+sympy
+cvxpy
+pandas
+matplotlib
+
+# The configuration files select MOSEK by default. It needs a license (free
+# for academic use); uncomment to install it. Without it, switch the solver
+# index in scripts/Configuration/*.py to SCS, which ships with CVXPY.
+# mosek
+
+# scripts/landing_phase_planner.py and twophase_landing_6dof_server_numba.py
+# run the planner as a ROS node; rospy and actionlib come from a ROS
+# installation and are not installable from PyPI.

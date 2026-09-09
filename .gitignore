@@ -1,0 +1,17 @@
+# Planner output
+scvx_traj*.csv
+traj*.png
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
