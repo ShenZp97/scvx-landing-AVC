@@ -2,7 +2,7 @@ import cvxpy as cvx
 import numpy as np
 import pandas as pd
 # from cvxpygen import cpg
-from scripts.Configuration.parameters_6dof_landing_twophase import weight_nu, weight_dx
+from scripts.Configuration.parameters_6dof_landing_twophase import weight_nu, weight_dx, carrier_traj_file
 
 class SCProblem:
     """
@@ -10,9 +10,11 @@ class SCProblem:
 
     :param m: The model object
     :param K: Number of discretization points
+    :param traj_file: Recorded AVC trajectory defining the time-varying landing
+        cone. Defaults to carrier_traj_file from the configuration.
     """
 
-    def __init__(self, m, K):
+    def __init__(self, m, K, traj_file=None):
         # Variables:
         self.K = K
         K_phase = int(np.ceil(K/2))
@@ -92,14 +94,15 @@ class SCProblem:
         # traj_file = '/home/shen/project/platform_data_driven_mpc/src/data_driven_mpc/ros_gp_mpc/src/quad_mpc/loop_takeoff.csv'
         # traj_file = '/home/shen/project/landing_mpc_ros/landing_exp_data/0823_1314_moving/loop_traj_new_platform.csv'
         # traj_file = '/home/shen/project/landing_mpc_ros/landing_exp_data/0823_1314_moving/loop_traj_platform.csv'
-        traj_file = '/home/aims-drone/project/show/landing_mpc_ros/landing_exp_data/aims3_exp_moving/loop_traj_platform_new.csv'
+        if traj_file is None:
+            traj_file = carrier_traj_file
 
         traj = pd.read_csv(traj_file, header=None)
         data_frames = pd.DataFrame(traj)
         traj_array = np.array(data_frames.values)
 
-        position_traj_1 = traj_array[1:751, 1:5]
-        # position_traj_1 = traj_array[1:2623, 1:5]
+        # position_traj_1 = traj_array[1:751, 1:5]
+        position_traj_1 = traj_array[1:2623, 1:5]
         time_points = np.array([2.66, 2.774, 2.888, 3.002, 3.116, 3.23,  3.344, 3.458, 3.572, 3.686, 3.8])
 
         # time_points = np.array([1.72284932, 1.92950636, 2.13616341, 2.34282045, 2.54947749, 2.75613454,
@@ -213,9 +216,15 @@ class SCProblem:
                             ]
 
         for k in range(K_phase-1, self.K - 1):
-            platform_position[0] = np.interp(time_points[k-K_phase+1]+start_time, position_traj_1[:,0], position_traj_1[:,1])
-            platform_position[1] = np.interp(time_points[k-K_phase+1]+start_time, position_traj_1[:,0], position_traj_1[:,2])
-            platform_position[2] = np.interp(time_points[k-K_phase+1]+start_time, position_traj_1[:,0], position_traj_1[:,3])
+            # A new array per node: CVXPY keeps a reference to the numpy data, so
+            # writing into one shared buffer would leave every cone constraint
+            # pointing at the apex of the last iteration.
+            t_k = time_points[k-K_phase+1] + start_time
+            platform_position = np.array([
+                np.interp(t_k, position_traj_1[:, 0], position_traj_1[:, 1]),
+                np.interp(t_k, position_traj_1[:, 0], position_traj_1[:, 2]),
+                np.interp(t_k, position_traj_1[:, 0], position_traj_1[:, 3]),
+            ])
             
             constraints += [
                 self.var['X'][:, k + 1] ==
@@ -256,9 +265,12 @@ class SCProblem:
         #                 ]
         # smaller ball position
         small_factor = 1.
-        platform_position[0] = np.interp(time_points[0]+start_time, position_traj_1[:,0], position_traj_1[:,1])
-        platform_position[1] = np.interp(time_points[0]+start_time, position_traj_1[:,0], position_traj_1[:,2])
-        platform_position[2] = np.interp(time_points[0]+start_time, position_traj_1[:,0], position_traj_1[:,3])
+        t_0 = time_points[0] + start_time
+        platform_position = np.array([
+            np.interp(t_0, position_traj_1[:, 0], position_traj_1[:, 1]),
+            np.interp(t_0, position_traj_1[:, 0], position_traj_1[:, 2]),
+            np.interp(t_0, position_traj_1[:, 0], position_traj_1[:, 3]),
+        ])
 
         constraints += [cvx.norm(self.var['X'][0: 3, K_phase-1] - (platform_position[0:3] + np.array([0, 0, height])), axis=0) <= small_factor*height*np.sin(np.arctan(self.tan_gamma_gs)),
                         # -self.var['X'][2, :] <= -0.5

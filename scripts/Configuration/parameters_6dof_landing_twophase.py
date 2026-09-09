@@ -1,7 +1,13 @@
 import cvxpy as cp
 import numpy as np
+import os
 # Trajectory points
 K = 20
+
+# Recorded AVC trajectory used to build the time-varying landing cone. Columns
+# 1 to 4 are read as time, x, y and z.
+carrier_traj_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 os.pardir, os.pardir, 'data', 'loop_traj_platform_new.csv')
 
 # Max solver iterations
 iterations = 10
